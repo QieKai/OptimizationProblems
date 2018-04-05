@@ -36,8 +36,37 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+//void read_graph(const int n, vector <pair<int,int> > &adjacent_list, map<pair<int,int>,int> &weight)
+//{
+//    string line;
+//    int lineCnt=-1;
+//    for(int i=0;i<n+1;i++)
+//    {
+//        std::getline(cin, line);
+//        istringstream iss(line);
+//        int a;
+//        while (iss >> a)adjacent_list.push_back(make_pair(lineCnt,a));
+//        lineCnt++;
+//    }
+//    lineCnt=0;
+//    for(int i=0;i<n;i++)
+//    {
+//        std::getline(cin, line);
+//        istringstream iss(line);
+//        int a;
+//        while (iss >> a) weight[adjacent_list[lineCnt++]] = a;
+//    }
+//#ifdef DEBUG
+//    for(std::map<pair<int,int>,int>::iterator iti=weight.begin(); iti!=weight.end(); ++iti)
+//    {
+//        cout << iti->first.first << " "<< iti->first.second << " -> " << iti->second<<endl;
+//    }
+//#endif
+//}
 void read_graph(const int n, vector <pair<int,int> > &adjacent_list, map<pair<int,int>,int> &weight)
 {
+    vector <pair<int,int> > adjacent_tmp;
+    map <pair<int,int>,int> adjacent;
     string line;
     int lineCnt=-1;
     for(int i=0;i<n+1;i++)
@@ -45,17 +74,26 @@ void read_graph(const int n, vector <pair<int,int> > &adjacent_list, map<pair<in
         std::getline(cin, line);
         istringstream iss(line);
         int a;
-        while (iss >> a)adjacent_list.push_back(make_pair(lineCnt,a));
+        while (iss >> a)
+        {
+            adjacent[make_pair(lineCnt,a)] = 1;
+            adjacent_tmp.push_back(make_pair(lineCnt,a));
+        }
         lineCnt++;
     }
+
     lineCnt=0;
     for(int i=0;i<n;i++)
     {
         std::getline(cin, line);
         istringstream iss(line);
         int a;
-        while (iss >> a) weight[adjacent_list[lineCnt++]] = a;
+        while (iss >> a) weight[adjacent_tmp[lineCnt++]] = a;
     }
+    for(map <pair<int,int>,int>::iterator it=adjacent.begin(); it!=adjacent.end(); ++it) {
+        adjacent_list.push_back(it->first);
+    }
+
 #ifdef DEBUG
     for(std::map<pair<int,int>,int>::iterator iti=weight.begin(); iti!=weight.end(); ++iti)
     {
@@ -221,8 +259,9 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
     /********* F_{I,4} *********/
     //
     int coeff1 = 0, coeff2 = 0;
-    for(v=1; v<node_size; v++)
+    for(v=0; v<node_size; v++)
     {
+        if (v == nominated_root) continue;
         // Z_v ^2
         for(int i=0;i<k+1;i++)
         {

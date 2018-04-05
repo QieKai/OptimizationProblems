@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
         int x = vars[edge2matrix[make_pair(u,v)]];
         sum = sum + x * weight[make_pair(u,v)];
     }
-    cout<<"optimal solution: "<<sum<<endl;
+    cout<<"Solution value  = "<<sum<<endl;
 
     return 0;
 }
