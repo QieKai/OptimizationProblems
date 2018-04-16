@@ -4,6 +4,10 @@
 #include <vector>
 #include <list>
 //#define DEBUG
+#define FIRST 0
+#define MIDDLE 1
+#define LAST 2
+
 using namespace std;
 void read_graph(const int n, vector <pair<int,int> > &adjacent_list, vector <int> &setU, map<pair<int,int>,int> &weight);
 int main(int argc, char **argv) {
@@ -19,13 +23,26 @@ int main(int argc, char **argv) {
     int nominated_root = setU[0];
 
     int cnt=0;
-    std::map<pair<int,int>,int> edge2matrix;
-    vector<pair<int,int> >::const_iterator iterator;
-    for (iterator = adjacent_list.begin(); iterator != adjacent_list.end(); ++iterator) {
+    std::map<vector<int>,int> edge2matrix;
+    for (vector<pair<int,int> >::iterator iterator = adjacent_list.begin(); iterator != adjacent_list.end(); ++iterator) {
         if ((*iterator).second == nominated_root) continue;
-        edge2matrix[*iterator] = cnt;
-        cnt++;
+        if ((*iterator).first == nominated_root) {
+            int myints[] = {iterator->first,iterator->second,1};
+            vector<int> var(myints, myints + sizeof(myints) / sizeof(int) );
+            edge2matrix[var] = cnt;
+            cnt++;
+        } else
+        {
+            for(int i=2;i<node_size;i++)
+            {
+                int myints[] = {iterator->first,iterator->second,i};
+                vector<int> var(myints, myints + sizeof(myints) / sizeof(int) );
+                edge2matrix[var] = cnt;
+                cnt++;
+            }
+        }
     }
+
     vector<int> vars;
     for(int i=0;i<cnt;i++){
         int var;
@@ -41,11 +58,11 @@ int main(int argc, char **argv) {
 
     int sum=0;
     /********* O_I *********/
-    for(std::map<pair<int,int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
+    for(std::map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
     {
-        int u = it->first.first;
-        int v = it->first.second;
-        int x = vars[edge2matrix[make_pair(u,v)]];
+        int u = it->first[FIRST];
+        int v = it->first[MIDDLE];
+        int x = vars[it->second];
         sum = sum + x * weight[make_pair(u,v)];
     }
     cout<<"Solution value  = "<<sum<<endl;

@@ -8,6 +8,10 @@
 #include <map>
 //#define DEBUG
 
+#define FIRST 0
+#define MIDDLE 1
+#define LAST 2
+
 using namespace std;
 void print_matrix(double **Q, int n);
 void read_graph(int n, vector <pair<int,int> > &adjacent_list, map<pair<int,int>,int> &weight);
@@ -68,10 +72,10 @@ void read_graph(const int n, vector <pair<int,int> > &adjacent_list, map<pair<in
     }
 
 #ifdef DEBUG
-    for(std::map<pair<int,int>,int>::iterator iti=weight.begin(); iti!=weight.end(); ++iti)
-    {
-        cout << iti->first.first << " "<< iti->first.second << " -> " << iti->second<<endl;
-    }
+    //    for(std::map<pair<int,int>,int>::iterator iti=weight.begin(); iti!=weight.end(); ++iti)
+//    {
+//        cout << iti->first.first << " "<< iti->first.second << " -> " << iti->second<<endl;
+//    }
 #endif
 }
 
@@ -81,29 +85,32 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
     // set nominated root as 0
     int nominated_root = 0;
 
-    // index for each variable in Q matrix
-    int cnt=0;
-    std::map<pair<int,int>,int> edge2matrix;
-    vector<pair<int,int> >::const_iterator iterator;
-    for (iterator = adjacent_list.begin(); iterator != adjacent_list.end(); ++iterator) {
-        if ((*iterator).second == nominated_root) continue;
-        edge2matrix[*iterator] = cnt;
-        cnt++;
-    }
+    map<vector<int>,int> edge2matrix;
 
-    std::map<pair<int,int>,int> x2matrix;
-    for(int u=1; u<node_size-1; u++)
-    {
-        for(int v=u+1; v<node_size;v++)
-        {
-            x2matrix[make_pair(u,v)] = cnt;
+    // init variables e_uv,i, and index of each variable in Q matrix
+    int cnt=0;
+    for (vector<pair<int,int> >::iterator iterator = adjacent_list.begin(); iterator != adjacent_list.end(); ++iterator) {
+        if ((*iterator).second == nominated_root) continue;
+        if ((*iterator).first == nominated_root) {
+            int myints[] = {iterator->first,iterator->second,1};
+            vector<int> var(myints, myints + sizeof(myints) / sizeof(int) );
+            edge2matrix[var] = cnt;
             cnt++;
+        } else
+        {
+            for(int i=2;i<node_size;i++)
+            {
+                int myints[] = {iterator->first,iterator->second,i};
+                vector<int> var(myints, myints + sizeof(myints) / sizeof(int) );
+                edge2matrix[var] = cnt;
+                cnt++;
+            }
         }
     }
 
-    // variables needed: N = (2|E| - Deg_G(v_0)) + C(|V|-1, 2) + |V|(k+1), where k = [log_2(∆)]
+    // variables needed in total: N = (2|E| - 2*Deg_G(v_0)) * (|V|-2) + Deg_G(v_0) + |V|(k+1), where k = [log_2(∆)]
     int k = (int)(log(degree_constraint)/log(2));
-    const long N = edge2matrix.size() + x2matrix.size() + node_size*(k+1);
+    const long N = edge2matrix.size() + node_size * (k+1);
 
     // initialize Q matrix
     Q = new double*[N];
@@ -114,83 +121,69 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
     }
 
 #ifdef DEBUG
-    /*********** debug ************/
-    for(std::map<pair<int,int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
+    for(map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
     {
-        printf("e%d,%d ", it->first.first+1, it->first.second+1);
+        printf("e%d,%d,%d -> %d |", it->first[FIRST]+1, it->first[MIDDLE]+1, it->first[LAST], it->second);
     }
-    for(std::map<pair<int,int>,int>::iterator it=x2matrix.begin(); it!=x2matrix.end(); ++it)
+    printf("\n");
+    for(map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
     {
-        printf("x%d,%d ", it->first.first+1, it->first.second+1);
+        printf("e%d,%d,%d ", it->first[FIRST]+1, it->first[MIDDLE]+1, it->first[LAST]);
     }
+
     for(int i=0; i<node_size;i++){
         for(int j=0;j<k+1;j++){
-            printf("z%d,%d ", i+1, j);
+            printf("z%d,%d   ", i+1, j);
         }
     }
     printf("\n");
-    /*********** debug ************/
 #endif
 
     /********* F_{I,1} *********/
-//    for(int u=1; u<node_size-3; u++)
-//    {
-//        for(int v=2; v<node_size-2; v++)
-//        {
-//            for(int w=3; w<node_size-1; w++)
-//            {
-//                if (x2matrix.count(make_pair(u,v)) == 0 || x2matrix.count(make_pair(u,w)) == 0
-//                    || x2matrix.count(make_pair(v,w)) == 0) continue;
-//                int x_uv = x2matrix[make_pair(u,v)];
-//                int x_uw = x2matrix[make_pair(u,w)];
-//                int x_vw = x2matrix[make_pair(v,w)];
-//                Q[x_uw][x_uw]++;
-//                Q[x_uv][x_vw]++;
-//                Q[x_uv][x_uw]--;
-//                Q[x_uw][x_vw]--;
-//            }
-//        }
-//    }
-    for(int u=0; u<node_size-2; u++)
+    int u,v;
+    for(v=0; v<node_size; v++)
     {
-        if (u == nominated_root) continue;
-        for(int v=1; v<node_size-1; v++)
+        if (v == nominated_root) continue;
+        for(map<vector<int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
         {
-            if (v == nominated_root) continue;
-            for(int w=2; w<node_size; w++)
-            {
-                if (w == nominated_root) continue;
-                if (x2matrix.count(make_pair(u,v)) == 0 || x2matrix.count(make_pair(u,w)) == 0
-                    || x2matrix.count(make_pair(v,w)) == 0) continue;
-                int x_uv = x2matrix[make_pair(u,v)];
-                int x_uw = x2matrix[make_pair(u,w)];
-                int x_vw = x2matrix[make_pair(v,w)];
-                Q[x_uw][x_uw]++;
-                Q[x_uv][x_vw]++;
-                Q[x_uv][x_uw]--;
-                Q[x_uw][x_vw]--;
+            if(iti->first[MIDDLE] == v){
+                for(map<vector<int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
+                {
+                    if(itj->first[MIDDLE] == v){
+                        if(iti->second!=itj->second)
+                        {
+                            int idx1 = iti->second;
+                            int idx2 = itj->second;
+                            Q[idx1][idx2]=Q[idx1][idx2] + node_size*node_size;
+                        }
+                        else
+                        {
+                            int idx = iti->second;
+                            Q[idx][idx]=Q[idx][idx] - node_size*node_size;
+                        }
+                    }
+                }
             }
         }
     }
-
+#ifdef DEBUG
+    printf("\n********* F_{I,1} *********\n");
+    print_matrix(Q, N);
+#endif
     /********* F_{I,2} *********/
-    // = ∑ e_{u,v}^2 -e_{u,v} * x_{u,v} + e_{v,u} * x_{u,v}
-    int u,v;
-    for (iterator = adjacent_list.begin(); iterator != adjacent_list.end(); ++iterator) {
-        u = (*iterator).first;
-        v = (*iterator).second;
-        if(u==nominated_root || v==nominated_root)continue;
-        if (u<v)
+    for(v=0; v<node_size; v++){
+        if (v == nominated_root) continue;
+        for(map<vector<int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
         {
-            // e_{u,v}^2
-            int idx1 = edge2matrix[*iterator];
-            Q[idx1][idx1]++;
-            // -e_{u,v} * x_{u,v}
-            int idx2 = x2matrix[*iterator];
-            Q[idx1][idx2]--;
-            // e_{v,u} * x_{u,v}
-            int idx3 = edge2matrix[make_pair(v,u)];
-            Q[idx3][idx2]++;
+            if(iti->first[MIDDLE] != v) continue;
+            for(map<vector<int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
+            {
+                if(itj->first[FIRST] != v) continue;
+                if(itj->first[LAST] > iti->first[LAST]) continue;
+                int idx1 = iti->second;
+                int idx2 = itj->second;
+                Q[idx1][idx2]++;
+            }
         }
     }
 #ifdef DEBUG
@@ -199,28 +192,21 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
 #endif
 
     /********* F_{I,3} *********/
-    for(v=0; v<node_size; v++)
-    {
+    for(v=0; v<node_size; v++){
         if (v == nominated_root) continue;
-        for(std::map<pair<int,int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
+        for(map<vector<int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
         {
-            if(iti->first.second == v){
-                for(std::map<pair<int,int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
-                {
-                    if(itj->first.second == v){
-                        if(iti->second!=itj->second)
-                        {
-                            int idx1 = iti->second;
-                            int idx2 = itj->second;
-                            Q[idx1][idx2]++;
-                        }
-                        else
-                        {
-                            int idx = iti->second;
-                            Q[idx][idx]--;
-                        }
-                    }
-                }
+            if(iti->first[MIDDLE] != v) continue;
+            if(iti->first[LAST] < 2) continue;
+            u=iti->first[FIRST];
+            int idx1 = iti->second;
+            Q[idx1][idx1]++;
+            for(map<vector<int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
+            {
+                if(itj->first[MIDDLE] != u) continue;
+                if(itj->first[LAST] != (iti->first[LAST]-1)) continue;
+                int idx2 = itj->second;
+                Q[idx1][idx2]--;
             }
         }
     }
@@ -228,7 +214,6 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
     printf("\n********* F_{I,3} *********\n");
     print_matrix(Q, N);
 #endif
-
     /********* F_{I,4} *********/
     //
     int coeff1 = 0, coeff2 = 0;
@@ -251,16 +236,16 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
             }
         }
 
-        // ( ∑ (e_{u,v} + e_{v,u} ) + ∑ e_{v0,v}) ^2
-        for(std::map<pair<int,int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
+        // ( ∑ (e_{u,v,i} + e_{v,u,i} ) + ∑ e_{v0,v,i}) ^2
+        for(map<vector<int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
         {
-            bool b1 = (iti->first.second == v) || (iti->first.first == v);
+            bool b1 = (iti->first[MIDDLE] == v) || (iti->first[FIRST] == v);
             if(b1)
             {
                 int idx1 = iti->second;
-                for(std::map<pair<int,int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
+                for(map<vector<int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
                 {
-                    bool b2 = (itj->first.second == v) || (itj->first.first == v);
+                    bool b2 = (itj->first[MIDDLE] == v) || (itj->first[FIRST] == v);
                     if(b2)
                     {
                         int idx2 = itj->second;
@@ -270,14 +255,14 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
             }
         }
 
-        // - 2 (Z_v ) * ( ∑ (e_{u,v} + e_{v,u} ) )
+        // - 2 (Z_v ) * ( ∑ (e_{u,v,i} + e_{v,u,i} ) )
         for(int i=0;i<k+1;i++)
         {
             if(i == k) coeff1 = degree_constraint+1-(int)pow(2,k);
             else coeff1 = (int)pow(2,i);
             int idx1 = cnt + v*(k+1) + i;
-            for(std::map<pair<int,int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti) {
-                bool b1 = (iti->first.second == v) || (iti->first.first == v);
+            for(map<vector<int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti) {
+                bool b1 = (iti->first[MIDDLE] == v) || (iti->first[FIRST] == v);
                 if (b1) {
                     int idx2 = iti->second;
                     Q[idx1][idx2] = Q[idx1][idx2] - coeff1;
@@ -287,7 +272,7 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
         }
     }
 
-    // (Z_v0 - ∑ e_{v0,u} )^2
+    // (Z_v0 - ∑ e_{v0,u,i} )^2
     // Z_v0 ^2
     for(int i=0;i<k+1;i++)
     {
@@ -300,14 +285,14 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
             Q[cnt+i][cnt+j] = Q[cnt+i][cnt+j] + coeff1 * coeff2;
         }
     }
-    // (∑ e_{v0,u} ) ^2
-    for(std::map<pair<int,int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
+    // (∑ e_{v0,u,i} ) ^2
+    for(map<vector<int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
     {
-        if(iti->first.first == nominated_root){
+        if(iti->first[FIRST] == nominated_root){
             int idx1 = iti->second;
-            for(std::map<pair<int,int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
+            for(std::map<vector<int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
             {
-                if(itj->first.first == nominated_root){
+                if(itj->first[FIRST] == nominated_root){
                     int idx2 = itj->second;
                     Q[idx1][idx2]++;
                 }
@@ -315,9 +300,9 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
         }
     }
     // - 2 * Z_v * (∑ e_{v0,u} )
-    for(std::map<pair<int,int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
+    for(map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
     {
-        if (it->first.first == nominated_root)
+        if (it->first[FIRST] == nominated_root)
         {
             int coeff=0;
             for(int i=0;i<k+1;i++)
@@ -336,7 +321,7 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
 
     /********* P_I *********/
     int maxWeight = 0;
-    for(std::map<pair<int,int>,int>::iterator it=weight.begin(); it!=weight.end(); ++it)
+    for(map<pair<int,int>,int>::iterator it=weight.begin(); it!=weight.end(); ++it)
         if (maxWeight < it->second) {maxWeight = it->second;}
     int P_I = (node_size-1) * maxWeight +1;
     for (int i=0; i<N; i++)
@@ -344,12 +329,17 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
         for (int j=0; j<N; j++)
             Q[i][j] = Q[i][j] * P_I;
     }
+#ifdef DEBUG
+    printf("\n********* P_I *********\n");
+    print_matrix(Q, N);
+    printf("\n");
+#endif
 
     /********* O_I *********/
-    for(std::map<pair<int,int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
+    for(map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
     {
-        u = it->first.first;
-        v = it->first.second;
+        u = it->first[FIRST];
+        v = it->first[MIDDLE];
         Q[it->second][it->second] = Q[it->second][it->second] + weight[make_pair(u,v)];
     }
 #ifdef DEBUG
@@ -364,7 +354,7 @@ const long generate_qubo(double **&Q, int node_size, int degree_constraint, vect
 void print_matrix(double **Q, const int n) {
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++)
-            printf("%4d ", (int) Q[i][j]);
+            printf("%6d ", (int) Q[i][j]);
         printf("\n");
     }
 }
