@@ -1,11 +1,11 @@
-// QUBO formulation for Steiner Tree
+// QUBO formulation for Degree-Constrained Minimum Spanning Tree (∆-spanning tree)
+// Variable dConst represents the degree constraint of ∆-spanning tree problem
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <sstream>
 #include <cmath>
 #include <map>
-#include <algorithm>
 #define DEBUG
 
 #define FIRST 0
@@ -14,24 +14,24 @@
 
 using namespace std;
 void print_matrix(double **Q, int n);
-void read_graph(int n, vector <pair<int,int> > &adjacent_list, vector <int> &setU, map<pair<int,int>,int> &weight);
-const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adjacent_list,
-                         vector <int> setU, map<pair<int,int>,int> weight, int hop_constraint);
+void read_graph(int n, vector <pair<int,int> > &adjacent_list, map<pair<int,int>,int> &weight);
+const long generate_qubo(double **&Q, int node_size, int hop_constraint, vector<pair<int, int> > adjacent_list,
+                         map<pair<int,int>,int> weight);
 
 int main(int argc, char *argv[])
 {
     int node_size=0,hop_constraint=0;
     double **Q;
     vector <pair<int,int> > adjacent_list;
-    vector <int> setU;
     map<pair<int,int>,int> weight;
     if (argc != 2) cout << "Correct usage: " << argv[0] <<" <Hop constraint>" << endl;
     else hop_constraint = (int)strtol (argv[1], nullptr,10);
+
     cin>>node_size;
 
-    read_graph(node_size,adjacent_list, setU, weight);
+    read_graph(node_size,adjacent_list, weight);
 
-    const long N = generate_qubo(Q, node_size, adjacent_list, setU, weight, hop_constraint);
+    const long N = generate_qubo(Q, node_size, hop_constraint, adjacent_list, weight);
     cout<<N<<endl;
     print_matrix(Q,N);
     for (int i=0; i<N; i++)
@@ -40,21 +40,52 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adjacent_list,
-                         vector <int> setU, map<pair<int,int>,int> weight, int hop_constraint)
+void read_graph(const int n, vector <pair<int,int> > &adjacent_list, map<pair<int,int>,int> &weight)
+{
+    vector <pair<int,int> > adjacent_tmp;
+    map <pair<int,int>,int> adjacent;
+    string line;
+    int lineCnt=-1;
+    for(int i=0;i<n+1;i++)
+    {
+        std::getline(cin, line);
+        istringstream iss(line);
+        int a;
+        while (iss >> a)
+        {
+            adjacent[make_pair(lineCnt,a)] = 1;
+            adjacent_tmp.push_back(make_pair(lineCnt,a));
+        }
+        lineCnt++;
+    }
+
+    lineCnt=0;
+    for(int i=0;i<n;i++)
+    {
+        std::getline(cin, line);
+        istringstream iss(line);
+        int a;
+        while (iss >> a) weight[adjacent_tmp[lineCnt++]] = a;
+    }
+    for(map <pair<int,int>,int>::iterator it=adjacent.begin(); it!=adjacent.end(); ++it) {
+        adjacent_list.push_back(it->first);
+    }
+
+#ifdef DEBUG
+    for(std::map<pair<int,int>,int>::iterator iti=weight.begin(); iti!=weight.end(); ++iti)
+    {
+        cout << iti->first.first << " "<< iti->first.second << " -> " << iti->second<<endl;
+    }
+#endif
+}
+
+const long generate_qubo(double **&Q, int node_size, int hop_constraint, vector<pair<int, int> > adjacent_list,
+                         map<pair<int,int>,int> weight)
 {
     // set nominated root as 0
-    int nominated_root = setU[0];
-
     map<vector<int>,int> edge2matrix;
 
-    // set V/U
-    vector <int> setV_U;
-    for(int i=0;i<node_size;i++){
-        if(std::find(setU.begin(), setU.end(), i) == setU.end()){
-            setV_U.push_back(i);
-        }
-    }
+    int nominated_root = 0;
 
     // init variables e_uv,i, and index of each variable in Q matrix
     int cnt=0;
@@ -100,9 +131,8 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
 #endif
 
     /********* F_{I,1} *********/
-    for(int i=0; i<setU.size(); i++)
+    for(int v=0; v<node_size; v++)
     {
-        int v = setU[i];
         if (v == nominated_root) continue;
         for(map<vector<int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
         {
@@ -127,26 +157,8 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
     printf("\n********* F_{I,1} *********\n");
     print_matrix(Q, N);
 #endif
-
+    int u, v;
     /********* F_{I,2} *********/
-    int u,v;
-    for(int i = 0; i<setV_U.size(); i++){
-        v=setV_U[i];
-        for(map<vector<int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti){
-            if (iti->first[MIDDLE] != v ) continue;
-            for(map<vector<int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj) {
-                if (itj->first[MIDDLE] != v || iti->first[FIRST] >= itj->first[FIRST]) continue;
-                Q[iti->second][itj->second]=Q[iti->second][itj->second] + node_size;
-            }
-        }
-    }
-
-#ifdef DEBUG
-    printf("\n********* F_{I,2} *********\n");
-    print_matrix(Q, N);
-#endif
-
-    /********* F_{I,3} *********/
     for(v=0; v<node_size; v++){
         if (v == nominated_root) continue;
         for(map<vector<int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
@@ -170,7 +182,7 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
         }
     }
 #ifdef DEBUG
-    printf("\n********* F_{I,3} *********\n");
+    printf("\n********* F_{I,2} *********\n");
     print_matrix(Q, N);
 #endif
 
@@ -185,7 +197,10 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
         for (int j=0; j<N; j++)
             Q[i][j] = Q[i][j] * P_I;
     }
-
+#ifdef DEBUG
+    printf("\n********* A *********\n");
+    print_matrix(Q, N);
+#endif
     /********* O_I *********/
     for(map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
     {
@@ -198,64 +213,13 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
     print_matrix(Q, N);
     printf("\n");
 #endif
-
     return N;
 }
 
-void print_matrix(double **Q, const int n)
-{
-    for (int i=0; i<n; i++)
-    {
-        for (int j=0; j<n; j++)
-            printf("%4d ", (int)Q[i][j]);
+void print_matrix(double **Q, const int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++)
+            printf("%6d ", (int) Q[i][j]);
         printf("\n");
     }
-}
-
-void read_graph(const int n, vector <pair<int,int> > &adjacent_list, vector <int> &setU, map<pair<int,int>,int> &weight)
-{
-    vector <pair<int,int> > adjacent_tmp;
-    map <pair<int,int>,int> adjacent;
-    string line;
-    int lineCnt=-1;
-    for(int i=0;i<n+1;i++)
-    {
-        std::getline(cin, line);
-        istringstream iss(line);
-        int a;
-        while (iss >> a)
-        {
-            adjacent[make_pair(lineCnt,a)] = 1;
-            adjacent_tmp.push_back(make_pair(lineCnt,a));
-        }
-        lineCnt++;
-    }
-
-    lineCnt=0;
-    for(int i=0;i<n;i++)
-    {
-        std::getline(cin, line);
-        istringstream iss(line);
-        int a;
-        while (iss >> a) weight[adjacent_tmp[lineCnt++]] = a;
-    }
-    for(map <pair<int,int>,int>::iterator it=adjacent.begin(); it!=adjacent.end(); ++it) {
-        adjacent_list.push_back(it->first);
-    }
-    std::getline(cin, line);
-    istringstream iss(line);
-    int a;
-    while (iss >> a) setU.push_back(a);
-
-#ifdef DEBUG
-    for(std::map<pair<int,int>,int>::iterator iti=weight.begin(); iti!=weight.end(); ++iti)
-    {
-        cout << iti->first.first << " "<< iti->first.second << " -> " << iti->second<<endl;
-    }
-
-    for(vector <int>::iterator iti=setU.begin(); iti!=setU.end(); ++iti)
-    {
-        cout << *iti <<endl;
-    }
-#endif
 }
