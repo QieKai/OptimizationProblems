@@ -6,7 +6,7 @@
 #include <cmath>
 #include <map>
 #include <algorithm>
-#define DEBUG
+//#define DEBUG
 
 #define FIRST 0
 #define MIDDLE 1
@@ -17,6 +17,7 @@ void print_matrix(double **Q, int n);
 void read_graph(int n, vector <pair<int,int> > &adjacent_list, vector <int> &setU, map<pair<int,int>,int> &weight);
 const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adjacent_list,
                          vector <int> setU, map<pair<int,int>,int> weight, int hop_constraint);
+void print_matrix_latex(double **Q, const int n);
 
 int main(int argc, char *argv[])
 {
@@ -34,6 +35,7 @@ int main(int argc, char *argv[])
     const long N = generate_qubo(Q, node_size, adjacent_list, setU, weight, hop_constraint);
     cout<<N<<endl;
     print_matrix(Q,N);
+    //print_matrix_latex(Q,N);
     for (int i=0; i<N; i++)
         delete [] Q[i];
     delete [] Q;
@@ -155,18 +157,19 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
             if(iti->first[LAST] < 2) continue;
             u=iti->first[FIRST];
             int idx1 = iti->second;
-            bool hasParent=false;
+            //bool hasParent=false;
+            Q[idx1][idx1]++;
             for(map<vector<int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
             {
                 if(itj->first[MIDDLE] != u) continue;
                 if(itj->first[LAST] != (iti->first[LAST]-1)) continue;
                 int idx2 = itj->second;
                 Q[idx1][idx2]--;
-                hasParent = true;
+                //hasParent = true;
             }
-            if (hasParent) {
-                Q[idx1][idx1]++;
-            }
+//            if (hasParent) {
+//                Q[idx1][idx1]++;
+//            }
         }
     }
 #ifdef DEBUG
@@ -185,7 +188,11 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
         for (int j=0; j<N; j++)
             Q[i][j] = Q[i][j] * P_I;
     }
-
+#ifdef DEBUG
+    printf("\n********* P_I *********\n");
+    print_matrix(Q, N);
+    printf("\n");
+#endif
     /********* O_I *********/
     for(map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
     {
@@ -211,6 +218,32 @@ void print_matrix(double **Q, const int n)
         printf("\n");
     }
 }
+
+void print_matrix_latex(double **Q, const int n)
+{
+    printf("\n");
+    for (int i=0; i<n; i++)
+    {
+        for (int j=0; j<n; j++)
+        {
+            if (j<i)
+            {
+                printf("&    ");
+            }
+            else
+            {
+                if (i!=j)
+                    printf("&%4d", (int)(Q[i][j]+Q[j][i]));
+                else
+                    printf("&%4d", (int)Q[i][j]);
+            }
+
+        }
+
+        printf("\n");
+    }
+}
+
 
 void read_graph(const int n, vector <pair<int,int> > &adjacent_list, vector <int> &setU, map<pair<int,int>,int> &weight)
 {

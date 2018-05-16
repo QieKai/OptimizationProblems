@@ -124,7 +124,7 @@ const long generate_qubo(double **&Q, int node_size, int hop_constraint, vector<
     /*********** debug ************/
     for(map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
     {
-        printf("e%d,%d ", it->first[FIRST]+1, it->first[MIDDLE]+1);
+        printf("e%d%d,%d ", it->first[FIRST]+1, it->first[MIDDLE]+1, it->second);
     }
     printf("\n");
     /*********** debug ************/
@@ -167,18 +167,19 @@ const long generate_qubo(double **&Q, int node_size, int hop_constraint, vector<
             if(iti->first[LAST] < 2) continue;
             u=iti->first[FIRST];
             int idx1 = iti->second;
-            bool hasParent=false;
+            Q[idx1][idx1]++;
+            //bool hasParent=false;
             for(map<vector<int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
             {
                 if(itj->first[MIDDLE] != u) continue;
                 if(itj->first[LAST] != (iti->first[LAST]-1)) continue;
                 int idx2 = itj->second;
                 Q[idx1][idx2]--;
-                hasParent = true;
+                //hasParent = true;
             }
-            if (hasParent) {
-                Q[idx1][idx1]++;
-            }
+//            if (hasParent) {
+//                Q[idx1][idx1]++;
+//            }
         }
     }
 #ifdef DEBUG
@@ -219,7 +220,7 @@ const long generate_qubo(double **&Q, int node_size, int hop_constraint, vector<
 void print_matrix(double **Q, const int n) {
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++)
-            printf("%6d ", (int) Q[i][j]);
+            printf("%7d ", (int) Q[i][j]);
         printf("\n");
     }
 }

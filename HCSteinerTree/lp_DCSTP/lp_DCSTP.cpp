@@ -7,29 +7,31 @@
 #include <vector>
 //#define DEBUG
 ILOSTLBEGIN
-
 using namespace std;
 
 bool find_all_sol=false;
-
 void read_graph(int n, vector <pair<int,int> > &adjacent_list, vector <int> &setU, map<pair<int,int>,int> &weight);
-
 
 int main (int argc, char **argv)
 {
-    if(argc > 1)
-    {
-        if(std::string(argv[1]) == "-a") find_all_sol = true;
-    }
-
-    int node_size=0;
+    int node_size=0, hop_constraint=0;
     vector <pair<int,int> > adjacent_list;
-    vector <int> setU;
     map<pair<int,int>,int> weight;
+    vector <int> setU;
+
+    if (argc < 2) cout << "Correct usage: " << argv[0] <<" <Hop constraint>" << endl;
+    else if(argc == 3){
+        string param1 = string(argv[1]);
+        string param2 = string(argv[2]);
+        if(param1 == "-a")hop_constraint = (int)strtol (argv[2], nullptr,10);
+        else if (param2 == "-a")hop_constraint = (int)strtol (argv[1], nullptr,10);
+        find_all_sol = true;
+    }
+    else hop_constraint = (int)strtol (argv[1], nullptr,10);
 
     cin>>node_size;
 
-    read_graph(node_size,adjacent_list, setU, weight);
+    read_graph(node_size,adjacent_list,setU,weight);
     int nominated_root = setU[0];
 
     int cnt=0;
@@ -44,46 +46,46 @@ int main (int argc, char **argv)
     }
 
 #ifdef DEBUG
-    for(vector <int>::iterator iti=setU.begin(); iti!=setU.end(); ++iti)
-    {
-        cout<<*iti<<" ";
-    }
-    cout<<endl;
     for(std::map<pair<int,int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
     {
         cout<<iti->first.first+1<<" "<<iti->first.second+1<<" "<<iti->second<<endl;
     }
 #endif
+
     IloEnv   env;
     try {
         IloModel model(env);
+
         IloNumVarArray var(env);
         IloRangeArray con(env);
-        //variables
+
+        //e_{u,v} variables
         for(std::map<pair<int,int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
         {
             char buffer [10];
             sprintf (buffer, "e_%d,%d", iti->first.first+1, iti->first.second+1);
             var.add(IloNumVar(env,0,1,ILOINT,buffer));
         }
-        // variable u and constraint 7
+
+        // d_v variables
         for(int i=0; i < node_size; i++){
             char buffer [10];
             sprintf (buffer, "d_%d", i+1);
-            if (i == nominated_root){
+            if (i == nominated_root){ // d_0 = 0
                 var.add(IloNumVar(env,0,0,ILOINT, buffer));
             }
-            else if(find(setU.begin(), setU.end(), i) != setU.end()){
-                var.add(IloNumVar(env,1,node_size-1,ILOINT, buffer));
+            else if(find(setU.begin(), setU.end(), i) != setU.end()){  // d_v >= 0 where v \in U
+                var.add(IloNumVar(env,1,hop_constraint,ILOINT, buffer));
             }
-            else
+            else // d_v >= -1
             {
-                var.add(IloNumVar(env,-1,node_size-1,ILOINT, buffer));
+                var.add(IloNumVar(env,-1,hop_constraint,ILOINT, buffer));
             }
         }
+
         IloExpr expr(env);
 
-        // objective function
+        // objective function  F((e,d)=∑ c_{u,v} e_{u,v}
         for(std::map<pair<int,int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
         {
             int u = it->first.first;
@@ -93,15 +95,15 @@ int main (int argc, char **argv)
 
         IloObjective obj = IloMinimize(env,expr);
 
-        // constraints
         IloExprArray expr_constrs2 = IloExprArray(env,node_size-1);
         IloExprArray expr_constrs3 = IloExprArray(env,node_size-1);
         IloExprArray expr_constrs4 = IloExprArray(env,node_size-1);
+
         int i = 0;
         for(int v=0; v<node_size; v++) {
             if(v==nominated_root) continue;
             expr_constrs2[i] = IloExpr(env);
-
+            // get ∑e_{u,v}
             for(std::map<pair<int,int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
             {
                 if (iti->first.second == v) {
@@ -109,49 +111,65 @@ int main (int argc, char **argv)
                 }
             }
 
-            // constraint 2
+            // ∑e_{u,v} <= 1
             char cont_name2 [10];
             sprintf (cont_name2, "c2_%d", i+1);
             con.add(IloRange(env, 0,expr_constrs2[i], 1,cont_name2));
 
-//            // constraint 3
+//            // (H+1) * ∑e_{u,v} >= d_v+1
             char cont_name3[10];
             sprintf (cont_name3, "c3_%d", i+1);
-            expr_constrs3[i] = expr_constrs2[i]*node_size-var[edge2matrix.size()+v]-1;
+            expr_constrs3[i] = expr_constrs2[i]*(hop_constraint+1)-var[edge2matrix.size()+v]-1;
             con.add(IloRange(env, 0,expr_constrs3[i],IloInfinity ,cont_name3));
 
-            // constraint 4
+            // 2* ∑e_{u,v} >= d_v + 1
             char cont_name4[10];
             sprintf (cont_name4, "c4_%d", i+1);
-            expr_constrs4[i] = node_size * (var[edge2matrix.size()+v]+1) - expr_constrs2[i]*(node_size+1);
+            expr_constrs4[i] = var[edge2matrix.size()+v]+1 - 2 *expr_constrs2[i];
             con.add(IloRange(env, 0,expr_constrs4[i],IloInfinity ,cont_name4));
+            
             i++;
         }
+         // 1 - H*(1-e_{u,v}) <=  d_v - d_u <= 1 + H*(1-e_{u,v})
         IloExprArray expr_constrs5_1 = IloExprArray(env,edge2matrix.size());
         IloExprArray expr_constrs5_2 = IloExprArray(env,edge2matrix.size());
-
-        // constraint 5
         i=0;
         for(std::map<pair<int,int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
         {
             int u = iti->first.first;
             int v = iti->first.second;
 
-            expr_constrs5_1[i] = var[edge2matrix.size()+v] - var[edge2matrix.size()+u] + node_size*(1-var[iti->second]);
+            expr_constrs5_1[i] = var[edge2matrix.size()+v] - var[edge2matrix.size()+u] + (hop_constraint+2)*(1-var[iti->second]);
             char cont_name5_1[10];
             sprintf (cont_name5_1, "c51_%d", i+1);
             con.add(IloRange(env, 1,expr_constrs5_1[i],IloInfinity ,cont_name5_1));
 
-            expr_constrs5_2[i] = var[edge2matrix.size()+u] - var[edge2matrix.size()+v] + node_size*(1-var[iti->second]) + 1;
+            expr_constrs5_2[i] = var[edge2matrix.size()+u] - var[edge2matrix.size()+v] + hop_constraint*(1-var[iti->second]) + 1;
             char cont_name5_2[10];
             sprintf (cont_name5_2, "c52_%d", i+1);
             con.add(IloRange(env, 0,expr_constrs5_2[i],IloInfinity ,cont_name5_2));
             i++;
         }
+
+//        IloExprArray expr_constrs8 = IloExprArray(env,node_size);
+//
+//        for(int v=0; v<node_size; v++) {
+//            expr_constrs8[v] = IloExpr(env);
+//            for(std::map<pair<int,int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
+//            {
+//                if ((*iti).first.second == v || (*iti).first.first == v) {
+//                    expr_constrs8[v] += var[(*iti).second];
+//                }
+//            }
+//            char buffer [10];
+//            sprintf (buffer, "c8_%d", v+1);
+//            con.add(IloRange(env, 1, expr_constrs8[v], hop_constraint, buffer));
+//        }
+
         model.add(obj);
         model.add(con);
         IloCplex cplex(model);
-        //cplex.exportModel("lpe.lp");
+        cplex.exportModel("lpe.lp");
 
         //do not display any cplex output on the screen
         cplex.setOut(env.getNullStream());
@@ -164,7 +182,7 @@ int main (int argc, char **argv)
                 cplex.setParam(IloCplex::PopulateLim,2100000000);
                 cplex.setParam(IloCplex::Param::OptimalityTarget,3);
                 if ( !cplex.populate() ) {
-                    env.error() << "Failed to optimize QUBO" << endl;
+                    env.error() << "Failed to optimize" << endl;
                     throw(-1);
                 }
 
@@ -191,14 +209,13 @@ int main (int argc, char **argv)
         } else {
             // Optimize the problem and obtain solution.
             if ( !cplex.solve() ) {
-                env.error() << "Failed to optimize QUBO" << endl;
+                env.error() << "Failed to optimize" << endl;
                 throw(-1);
             }
             IloNumArray vals(env);
             //env.out() << "Solution status = " << cplex.getStatus() << endl;
             env.out() << "Solution value  = " << cplex.getObjValue() << endl;
             cplex.getValues(vals, var);
-            //env.out() << "Variables = " << vals << endl;
             //env.out() << "Variables = " << vals << endl;
             //env.out() <<"Variables = ["; // << vals << endl;
 //            for (int j = 0; j<n-1; j++) env.out() << vals[j] << ',';
@@ -235,7 +252,7 @@ void read_graph(const int n, vector <pair<int,int> > &adjacent_list, vector <int
         }
         lineCnt++;
     }
-
+    
     lineCnt=0;
     for(int i=0;i<n;i++)
     {
@@ -251,7 +268,7 @@ void read_graph(const int n, vector <pair<int,int> > &adjacent_list, vector <int
     istringstream iss(line);
     int a;
     while (iss >> a) setU.push_back(a);
-
+    
 #ifdef DEBUG
     for(std::map<pair<int,int>,int>::iterator iti=weight.begin(); iti!=weight.end(); ++iti)
     {
@@ -259,3 +276,4 @@ void read_graph(const int n, vector <pair<int,int> > &adjacent_list, vector <int
     }
 #endif
 }
+
