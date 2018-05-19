@@ -73,10 +73,11 @@ int main (int argc, char **argv)
         }
 
         IloNumArray vals(env);
-        env.out() << "Solution status = " << cplex.getStatus() << endl;
-        env.out() << "Solution value  = " << cplex.getObjValue() << endl;
-        cplex.getValues(vals, var);
-        env.out() << "Values = " << vals << endl;
+        //env.out() << "Solution status = " << cplex.getStatus() << endl;
+        //env.out() << "Solution value  = " << cplex.getObjValue() << endl;
+        //cplex.getValues(vals, var);
+        //env.out() << "Values = " << vals << endl;
+        cout<<cplex.getObjValue();
     }
     catch (IloException& e) {
         cerr << "Concert exception caught: " << e << endl;
