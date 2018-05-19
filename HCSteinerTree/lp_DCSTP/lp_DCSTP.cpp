@@ -151,25 +151,10 @@ int main (int argc, char **argv)
             i++;
         }
 
-//        IloExprArray expr_constrs8 = IloExprArray(env,node_size);
-//
-//        for(int v=0; v<node_size; v++) {
-//            expr_constrs8[v] = IloExpr(env);
-//            for(std::map<pair<int,int>,int>::iterator iti=edge2matrix.begin(); iti!=edge2matrix.end(); ++iti)
-//            {
-//                if ((*iti).first.second == v || (*iti).first.first == v) {
-//                    expr_constrs8[v] += var[(*iti).second];
-//                }
-//            }
-//            char buffer [10];
-//            sprintf (buffer, "c8_%d", v+1);
-//            con.add(IloRange(env, 1, expr_constrs8[v], hop_constraint, buffer));
-//        }
-
         model.add(obj);
         model.add(con);
         IloCplex cplex(model);
-        cplex.exportModel("lpe.lp");
+        //cplex.exportModel("lpe.lp");
 
         //do not display any cplex output on the screen
         cplex.setOut(env.getNullStream());
@@ -214,8 +199,9 @@ int main (int argc, char **argv)
             }
             IloNumArray vals(env);
             //env.out() << "Solution status = " << cplex.getStatus() << endl;
-            env.out() << "Solution value  = " << cplex.getObjValue() << endl;
-            cplex.getValues(vals, var);
+            //env.out() << "Solution value  = " << cplex.getObjValue() << endl;
+            cout<<cplex.getObjValue();
+            //cplex.getValues(vals, var);
             //env.out() << "Variables = " << vals << endl;
             //env.out() <<"Variables = ["; // << vals << endl;
 //            for (int j = 0; j<n-1; j++) env.out() << vals[j] << ',';

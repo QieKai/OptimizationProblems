@@ -1,4 +1,8 @@
 // C++ program to verify solutions from D-Wave
+// Usage: ./a.out [options] graph.alist optimalSolution < dwave.d.out
+// The following options are available:
+// -c print as csv format
+// -d print debug information
 #include <iostream>
 #include <fstream>
 #include <list>
@@ -23,9 +27,9 @@ int total_run=0,chainsize=0,order=0,size=0,k=0,lqubit=0, pqubit=0,k_coloring=0,c
 int main(int argc, char *argv[])
 {
     list <pair<int,int> > adjacent_list;
-    if (argc < 2)
+    if (argc < 3)
     {
-      cout << "Correct usage: " << argv[0] <<" <filename>" << endl;
+      cout << "Correct usage: " << argv[0] <<" <filename> <optimalSol>" << endl;
       return 0;
     }
     else if (argc==3)
@@ -39,7 +43,7 @@ int main(int argc, char *argv[])
       if(arg.find('d')!=string::npos) DEBUG=true;
       if(arg.find('c')!=string::npos) CSV=true;
       read_graph(argv[2], adjacent_list);
-        chromaticSum = (int)strtol(argv[3], nullptr,10);
+      chromaticSum = (int)strtol(argv[3], nullptr,10);
     }
 
     vector<int*> solutions = ProcDWaveOutput(order);
@@ -67,6 +71,7 @@ void read_graph(string filename, list <pair<int,int> > &adjacent_list)
         lineCnt++;
     }
     size=(int)adjacent_list.size()/2;
+    infile.close();
 }
 
 // parse dwave.out and return all optimal QUBO variable assignments

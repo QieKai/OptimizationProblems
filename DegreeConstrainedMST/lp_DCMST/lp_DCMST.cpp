@@ -168,7 +168,7 @@ int main (int argc, char **argv)
         model.add(obj);
         model.add(con);
         IloCplex cplex(model);
-        cplex.exportModel("lpe.lp");
+        //cplex.exportModel("lpe.lp");
 
         //do not display any cplex output on the screen
         cplex.setOut(env.getNullStream());
@@ -213,8 +213,9 @@ int main (int argc, char **argv)
             }
             IloNumArray vals(env);
             //env.out() << "Solution status = " << cplex.getStatus() << endl;
-            env.out() << "Solution value  = " << cplex.getObjValue() << endl;
-            cplex.getValues(vals, var);
+            //env.out() << "Solution value  = " << cplex.getObjValue() << endl;
+            cout<<cplex.getObjValue();
+            //cplex.getValues(vals, var);
             //env.out() << "Variables = " << vals << endl;
             //env.out() <<"Variables = ["; // << vals << endl;
 //            for (int j = 0; j<n-1; j++) env.out() << vals[j] << ',';
