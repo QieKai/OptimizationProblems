@@ -36,16 +36,19 @@ int main(int argc, char* argv[])
     int n,k;
     double **Q;
     cin>>n;
-    cin>>k;
+    //cin>>k;
     read_qubo(n,Q);
     
     for (int i=0; i<n; i++)
     {
         for(int j=i+1;j<n;j++)
         {
-            Q[i][j]=Q[i][j]+Q[j][i];
+            //Q[i][j]=Q[i][j]+Q[j][i];
+            Q[j][i]=Q[i][j];
+            
         }
     }
+    cout<<n<<endl;
     printMatrix(Q,n);
     
     for (int i=0; i<n; i++)

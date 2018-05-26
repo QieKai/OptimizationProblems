@@ -1,4 +1,5 @@
 // C++ program to verify solutions from D-Wave
+// Usage: ./a.out [options] graph.alist optimalSolution < dwave.d.out
 // The following options are available:
 // -c print as csv format
 // -d print debug information
@@ -15,14 +16,16 @@ void read_graph(string filename, vector <pair<int,int> > &adjacent_list, map<pai
 void ProcDWaveOutput(int &quboSize, map<vector<int>, int> &);
 void find_and_replace(string& source, string const& find, string const& replace);
 vector<string> split(const std::string &text, char sep);
+void VerifySolutions(map<vector<int>, int>&, map<pair<int,int>,int>, map<pair<int,int>,int>, vector <pair<int,int> >);
 void CalcAccuracy(map<vector<int>, int>, map<pair<int,int>,int>, map<pair<int,int>,int>);
 void printCSV(int min);
 void printSol(map<int,int> solOccur);
+void printDebug(int, int, vector<int>);
 
 bool DEBUG=false;
 bool CSV=false;
 
-int total_run=0,chainsize=0,order=0,size=0,lqubit=0, pqubit=0,minCost=0,correct_run=0;
+int total_run=0,chainsize=0,order=0,size=0,lqubit=0, pqubit=0,minCost=0,correct_run=0,degree_constraint=0;
 
 int main(int argc, char *argv[])
 {
@@ -52,9 +55,9 @@ int main(int argc, char *argv[])
     map<vector<int> ,int> quboSolutions;
     ProcDWaveOutput(quboSize, quboSolutions);
     if(DEBUG) {
-        for (auto it = quboSolutions.begin(); it != quboSolutions.end(); ++it) {
-            cout << "[" << it->second << "]: ";
-            for (int i = 0; i < quboSize; i++)cout << it->first[i] << " ";
+        for (auto it : quboSolutions) {
+            cout << "[" << it.second << "]: ";
+            for (int i = 0; i < quboSize; i++)cout << it.first[i] << " ";
             cout << endl;
         }
     }
@@ -62,22 +65,25 @@ int main(int argc, char *argv[])
     // set nominated root as 0
     int nominated_root = 0;
     int cnt=0;
-    std::map<pair<int,int>,int> edge2matrix;
-    vector<pair<int,int> >::const_iterator iterator;
-    for (iterator = adjacent_list.begin(); iterator != adjacent_list.end(); ++iterator) {
-        if ((*iterator).second == nominated_root) continue;
-        edge2matrix[*iterator] = cnt;
+    map<pair<int,int>,int> edge2matrix;
+    for (auto iterator : adjacent_list) {
+        if (iterator.second == nominated_root) continue;
+        edge2matrix[iterator] = cnt;
         cnt++;
     }
-
-    if(DEBUG)
+    map<pair<int,int>,int> x2matrix;
+    for(int u=1; u<order-1; u++)
     {
-        for(std::map<pair<int,int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
+        for(int v=u+1; v<order;v++)
         {
-            printf("e%d,%d ", it->first.first+1, it->first.second+1);
+            x2matrix[make_pair(u,v)] = cnt;
+            cnt++;
         }
     }
 
+    if(DEBUG) for(auto it:edge2matrix) printf("e%d,%d ", it.first.first+1, it.first.second+1);
+    cout<<endl;
+    //VerifySolutions(quboSolutions, edge2matrix, x2matrix, adjacent_list);
     CalcAccuracy(quboSolutions, edge2matrix, weight);
 
     return 0;
@@ -89,13 +95,20 @@ void ProcDWaveOutput(int &quboSize, map<vector<int>, int> &solutions){
 
     while(std::getline(cin, line))
     {
-        size_t kpos = line.find("n=");
-        if (kpos!=string::npos && line.length()>=kpos+5)
+        size_t kpos = line.find("header:");
+        if (kpos!=string::npos && line.length()>=kpos+12)
         {
-            string ks = line.substr(kpos,line.length()-kpos);
-            ks = ks.substr(ks.find(',')+1, ks.find(')')-ks.find(',')-1);
-            quboSize = atoi(ks.c_str());
+            size_t p1 = line.find('[');
+            size_t p2 = line.find(']');
+            string ks = line.substr(p1+1,p2-p1-1);
+            find_and_replace( ks, "\'", "");
+            vector<string>nc = split(ks, ',');
+
+            quboSize = atoi(nc[0].c_str());
+            degree_constraint = atoi(nc[1].c_str());
+
             if (DEBUG) cout<<"qubo size: "<<quboSize<<endl;
+            if (DEBUG) cout<<"degree constraint: "<<degree_constraint<<endl;
             lqubit=quboSize;
         }
 
@@ -131,8 +144,8 @@ void ProcDWaveOutput(int &quboSize, map<vector<int>, int> &solutions){
             {
                 string s = line.substr(pf+1,pe-pf-1);
                 vector<string> num_occurrences = split(s,',');
-                for(int i=0;i<num_occurrences.size();i++){
-                    int occ = atoi(num_occurrences[i].c_str());
+                for(auto const n : num_occurrences){
+                    int occ = atoi(n.c_str());
                     occurrences.push_back(occ);
                     total_run+=occ;
                 }
@@ -151,8 +164,8 @@ void ProcDWaveOutput(int &quboSize, map<vector<int>, int> &solutions){
                 {
                     string s = line.substr(pf+1,pe-pf-1);
                     line = line.substr(pe+1);
-                    std::vector<int> sol;
-                    for (int i=0;i<quboSize;i++) sol.push_back(s[i*3]-'0');
+                    std::vector<int> sol((unsigned long)quboSize,0);
+                    for (int i=0;i<quboSize;i++) sol[i]=(s[i*3]-'0');
                     solutions[sol] = occurrences[idx];
                     idx++;
                 }
@@ -162,11 +175,116 @@ void ProcDWaveOutput(int &quboSize, map<vector<int>, int> &solutions){
     }
 }
 
+void VerifySolutions(map<vector<int> ,int>& quboSolutions, map<pair<int,int>,int> edge2matrix, map<pair<int,int>,int> x2matrix, vector <pair<int,int> > adjacent_list)
+{
+    int nominated_root=0;
+    bool valid=true;
+    for(auto sol:quboSolutions)
+    {
+        auto vars = sol.first;
+        int F1=0;
+        /********* F_{I,1} *********/
+        for(int u=0; u<order-2; u++)
+        {
+            if (u == nominated_root) continue;
+            for(int v=1; v<order-1; v++)
+            {
+                if (v == nominated_root) continue;
+                for(int w=2; w<order; w++)
+                {
+                    if (w == nominated_root) continue;
+                    if (x2matrix.count(make_pair(u,v)) == 0 || x2matrix.count(make_pair(u,w)) == 0
+                        || x2matrix.count(make_pair(v,w)) == 0) continue;
+                    int x_uv = x2matrix[make_pair(u,v)];
+                    int x_uw = x2matrix[make_pair(u,w)];
+                    int x_vw = x2matrix[make_pair(v,w)];
+                    F1 = F1 + vars[x_uw] + vars[x_uv]*vars[x_vw] - vars[x_uv]*vars[x_uw]- vars[x_uw]*vars[x_vw];
+                }
+            }
+        }
+        if (F1 != 0) {
+            if(DEBUG)printDebug(1,F1,vars);
+            //quboSolutions.erase(sol.first);
+            continue;
+        }
+
+        /********* F_{I,2} *********/
+        int F2=0;
+        int u,v;
+        for (auto iterator : adjacent_list) {
+            u = iterator.first;
+            v = iterator.second;
+            if(u==nominated_root || v==nominated_root)continue;
+            if (u<v)
+            {
+                // e_{u,v}
+                int idx1 = edge2matrix[iterator];
+                // x_{u,v}
+                int idx2 = x2matrix[iterator];
+                // e_{v,u}
+                int idx3 = edge2matrix[make_pair(v,u)];
+                F2=F2+vars[idx1]*(1-vars[idx2])+vars[idx2]*vars[idx3];
+            }
+        }
+        cout<<"f21"<<endl;
+        if (F2 != 0) {
+            if(DEBUG)printDebug(2,F2,vars);
+            //quboSolutions.erase(sol.first);
+            continue;
+        }
+
+        /********* F_{I,3} *********/
+        int F3=0;
+        valid=true;
+        for(v=0; v<order; v++)
+        {
+            F3=0;
+            if (v == nominated_root) continue;
+            for(auto iti:edge2matrix)
+            {
+                if(iti.first.second == v){
+                    F3=F3+vars[iti.second];
+                }
+            }
+            if (F3 != 1) {
+                if(DEBUG)printDebug(3,F3,vars);
+                //quboSolutions.erase(sol.first);
+                valid=false;
+                break;
+            }
+        }
+        if (!valid) {
+            cout<<"f31"<<endl;
+            continue;
+        }
+        cout<<"f32"<<endl;
+
+        /********* F_{I,4} *********/
+        int F4;
+        for(v=0; v<order; v++) {
+            F4 = 0;
+            if (v == nominated_root) continue;
+            for(auto iti:edge2matrix)
+            {
+                if(iti.first.second == v || iti.first.first == v){
+                    F4=F4+vars[iti.second];
+                }
+            }
+            if (F4 > degree_constraint) {
+                if(DEBUG)printDebug(4,F4,vars);
+                //quboSolutions.erase(sol.first);
+                break;
+            }
+        }
+    }
+    cout<<"finish verify"<<endl;
+}
+
 void CalcAccuracy(map<vector<int> ,int> quboSolutions, map<pair<int,int>,int> edge2matrix, map<pair<int,int>,int> weight)
 {
     map<int,int> solOccur;
 
-    for(auto sol=quboSolutions.begin(); sol!=quboSolutions.end(); ++sol)
+    for(auto sol:quboSolutions)
     {
         int sum=0;
         /********* O_I *********/
@@ -174,12 +292,12 @@ void CalcAccuracy(map<vector<int> ,int> quboSolutions, map<pair<int,int>,int> ed
         {
             int u = it->first.first;
             int v = it->first.second;
-            int x = sol->first[edge2matrix[make_pair(u,v)]];
+            int x = sol.first[edge2matrix[make_pair(u,v)]];
             sum = sum + x * weight[make_pair(u,v)];
         }
 
-        if(solOccur.count(sum)==0) solOccur[sum] = sol->second;
-        else solOccur[sum] = solOccur[sum] + sol->second;
+        if(solOccur.count(sum)==0) solOccur[sum] = sol.second;
+        else solOccur[sum] = solOccur[sum] + sol.second;
         if (DEBUG) cout<<"Solution value  = "<<sum<<" occurance  = "<<solOccur[sum]<<endl;
     }
 
@@ -188,26 +306,6 @@ void CalcAccuracy(map<vector<int> ,int> quboSolutions, map<pair<int,int>,int> ed
 
     if(CSV)printCSV(solOccur.begin()->first);
     else printSol(solOccur);
-}
-
-// print
-void printCSV(int min)
-{
-    cout<<order<<","<<size<<",";
-    cout<<lqubit<<","<<pqubit<<",";
-    cout<<chainsize<<",";
-    cout<<correct_run<<"/"<<total_run <<",";
-    cout<<min;
-    cout<<",";
-    cout<<minCost;
-}
-
-void printSol(map<int,int> solOccur)
-{
-    for(auto it=solOccur.begin(); it!=solOccur.end(); ++it)
-    {
-        cout<<"Solution value  = "<<it->first<<"; occurance  = "<<it->second<<endl;
-    }
 }
 
 void read_graph(string filename, vector <pair<int,int> > &adjacent_list, map<pair<int,int>,int> &weight)
@@ -233,7 +331,7 @@ void read_graph(string filename, vector <pair<int,int> > &adjacent_list, map<pai
         while (iss >> a)
         {
             adjacent[make_pair(lineCnt,a)] = 1;
-            adjacent_tmp.push_back(make_pair(lineCnt,a));
+            adjacent_tmp.emplace_back(make_pair(lineCnt,a));
         }
         lineCnt++;
     }
@@ -246,20 +344,40 @@ void read_graph(string filename, vector <pair<int,int> > &adjacent_list, map<pai
         int a;
         while (iss >> a) weight[adjacent_tmp[lineCnt++]] = a;
     }
-    for(auto it=adjacent.begin(); it!=adjacent.end(); ++it) {
-        adjacent_list.push_back(it->first);
+    for(auto it:adjacent) {
+        adjacent_list.push_back(it.first);
     }
 
     size=(int)adjacent_list.size()/2;
     infile.close();
+}
 
-    if(DEBUG)
+// print
+void printCSV(int min)
+{
+    cout<<order<<","<<size<<","<<degree_constraint<<",";
+    cout<<lqubit<<","<<pqubit<<",";
+    cout<<chainsize<<",";
+    cout<<correct_run<<"/"<<total_run <<",";
+    cout<<min;
+    cout<<",";
+    cout<<minCost;
+}
+
+void printSol(map<int,int> solOccur)
+{
+    for(auto it:solOccur)
     {
-        for(auto iti=weight.begin(); iti!=weight.end(); ++iti)
-        {
-            cout << iti->first.first << " "<< iti->first.second << " -> " << iti->second<<endl;
-        }
+        cout<<"Solution value  = "<<it.first<<"; occurance  = "<<it.second<<endl;
     }
+}
+
+void printDebug(int num, int F, vector<int> vars)
+{
+    cout<<"F"<<num<< " = "<< F<<endl;
+    cout<<"variables:[";
+    for (auto i : vars) cout<<i<<" ";
+    cout<<"]"<<endl;
 }
 
 // utilities
