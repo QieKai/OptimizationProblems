@@ -11,8 +11,9 @@
 #include <vector>
 #include <map>
 
-using namespace std;
-void read_graph(string filename, vector <pair<int,int> > &adjacent_list, vector <int> &setU, map<pair<int,int>,int> &weight);
+using namespace std;// The following options are available:
+
+void read_graph(const string&, vector <pair<int,int> > &adjacent_list, vector <int> &setU, map<pair<int,int>,int> &weight);
 void ProcDwaveOutput(int &quboSize, map<vector<int> ,int>&);
 void find_and_replace(string& source, string const& find, string const& replace);
 vector<string> split(const std::string &text, char sep);
@@ -37,7 +38,8 @@ int main(int argc, char *argv[])
     }
     else if (argc==3)
     {
-        read_graph(argv[1],adjacent_list,setU, weight);
+        string filename = argv[1];
+        read_graph(filename,adjacent_list,setU, weight);
         minCost = (int)strtol(argv[2], nullptr,10);
     }
     else if (argc==4)
@@ -45,7 +47,8 @@ int main(int argc, char *argv[])
         string arg = string(argv[1]);
         if(arg.find('d')!=string::npos) DEBUG=true;
         if(arg.find('c')!=string::npos) CSV=true;
-        read_graph(argv[2],adjacent_list,setU, weight);
+        string filename = argv[2];
+        read_graph(filename,adjacent_list,setU, weight);
         minCost = (int)strtol(argv[3], nullptr,10);
     }
 
@@ -54,10 +57,10 @@ int main(int argc, char *argv[])
     map<vector<int> ,int> quboSolutions;
     ProcDwaveOutput(quboSize, quboSolutions);
     if(DEBUG){
-        for(map<vector<int> ,int>::iterator it=quboSolutions.begin(); it!=quboSolutions.end(); ++it)
+        for(auto it:quboSolutions)
         {
-            cout<<"["<<it->second<<"]: ";
-            for(int i=0;i<quboSize;i++)cout<<it->first[i]<<" ";
+            cout<<"["<<it.second<<"]: ";
+            for(int i=0;i<quboSize;i++)cout<<it.first[i]<<" ";
             cout<<endl;
         }
     }
@@ -71,8 +74,8 @@ int main(int argc, char *argv[])
         edge2matrix[*iterator] = cnt;
         cnt++;
     }
-
-    CalcAccuracy(quboSolutions, edge2matrix, weight);
+    if(DEBUG) for(auto it:edge2matrix) printf("e%d,%d ", it.first.first+1, it.first.second+1);
+    cout<<endl;    CalcAccuracy(quboSolutions, edge2matrix, weight);
 
     return 0;
 }
@@ -83,12 +86,14 @@ void ProcDwaveOutput(int &quboSize, map<vector<int> ,int>&solutions){
 
     while(std::getline(cin, line))
     {
-        size_t kpos = line.find("n=");
-        if (kpos!=string::npos && line.length()>=kpos+5)
+        size_t kpos = line.find("header:");
+        if (kpos!=string::npos && line.length()>=kpos+12)
         {
-            string ks = line.substr(kpos,line.length()-kpos);
-            ks = ks.substr(ks.find(',')+1, ks.find(')')-ks.find(',')-1);
-            quboSize = atoi(ks.c_str());
+            size_t p1 = line.find('[');
+            size_t p2 = line.find(']');
+            string ks = line.substr(p1+1,p2-p1-1);
+            find_and_replace( ks, "\'", "");
+            quboSize = (int)strtol(ks.c_str(), nullptr,10);
             if (DEBUG) cout<<"qubo size: "<<quboSize<<endl;
             lqubit=quboSize;
         }
@@ -113,7 +118,7 @@ void ProcDwaveOutput(int &quboSize, map<vector<int> ,int>&solutions){
         if (qpos!=string::npos)
         {
             string ks = line.substr(line.find('=')+1,line.length()-line.find('=')-1);
-            pqubit = atoi(ks.c_str());
+            pqubit = (int)strtol(ks.c_str(), nullptr,10);
 
         }
 
@@ -125,8 +130,8 @@ void ProcDwaveOutput(int &quboSize, map<vector<int> ,int>&solutions){
             {
                 string s = line.substr(pf+1,pe-pf-1);
                 vector<string> num_occurrences = split(s,',');
-                for(int i=0;i<num_occurrences.size();i++){
-                    int occ = atoi(num_occurrences[i].c_str());
+                for(auto const& n : num_occurrences){
+                    auto occ = (int)strtol(n.c_str(), nullptr,10);
                     occurrences.push_back(occ);
                     total_run+=occ;
                 }
@@ -145,8 +150,8 @@ void ProcDwaveOutput(int &quboSize, map<vector<int> ,int>&solutions){
                 {
                     string s = line.substr(pf+1,pe-pf-1);
                     line = line.substr(pe+1);
-                    std::vector<int> sol;
-                    for (int i=0;i<quboSize;i++) sol.push_back(s[i*3]-'0');
+                    std::vector<int> sol((unsigned long)quboSize,0);
+                    for (int i=0;i<quboSize;i++) sol[i]=(s[i*3]-'0');
                     solutions[sol] = occurrences[idx];
                     idx++;
                 }
@@ -161,20 +166,20 @@ void CalcAccuracy(map<vector<int> ,int> quboSolutions, map<pair<int,int>,int> ed
 {
     map<int,int> solOccur;
 
-    for(map<vector<int> ,int>::iterator sol=quboSolutions.begin(); sol!=quboSolutions.end(); ++sol)
+    for(auto sol:quboSolutions)
     {
         int sum=0;
         /********* O_I *********/
-        for(std::map<pair<int,int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
+        for(auto it:edge2matrix)
         {
-            int u = it->first.first;
-            int v = it->first.second;
-            int x = sol->first[edge2matrix[make_pair(u,v)]];
+            int u = it.first.first;
+            int v = it.first.second;
+            int x = sol.first[edge2matrix[make_pair(u,v)]];
             sum = sum + x * weight[make_pair(u,v)];
         }
 
-        if(solOccur.count(sum)==0) solOccur[sum] = sol->second;
-        else solOccur[sum] = solOccur[sum] + sol->second;
+        if(solOccur.count(sum)==0) solOccur[sum] = sol.second;
+        else solOccur[sum] = solOccur[sum] + sol.second;
         if (DEBUG) cout<<"Solution value  = "<<sum<<" occurance  = "<<solOccur[sum]<<endl;
     }
 
@@ -192,7 +197,8 @@ void printCSV(int min)
     cout<<order<<","<<size<<",";
     cout<<lqubit<<","<<pqubit<<",";
     cout<<chainsize<<",";
-    cout<<correct_run<<"/"<<total_run <<",";
+    //cout<<correct_run<<"/"<<total_run <<",";
+    cout<<correct_run<<",";
     cout<<min;
     cout<<",";
     cout<<minCost;
@@ -200,13 +206,13 @@ void printCSV(int min)
 
 void printSol(map<int,int> solOccur)
 {
-    for(map<int,int>::iterator it=solOccur.begin(); it!=solOccur.end(); ++it)
+    for(auto it:solOccur)
     {
-        cout<<"Solution value  = "<<it->first<<"; occurance  = "<<it->second<<endl;
+        cout<<"Solution value  = "<<it.first<<"; occurance  = "<<it.second<<endl;
     }
 }
 
-void read_graph(string filename, vector <pair<int,int> > &adjacent_list, vector <int> &setU, map<pair<int,int>,int> &weight)
+void read_graph(const string& filename, vector <pair<int,int> > &adjacent_list, vector <int> &setU, map<pair<int,int>,int> &weight)
 {
     ifstream infile( filename );
     if (infile.is_open()==0)
@@ -229,7 +235,7 @@ void read_graph(string filename, vector <pair<int,int> > &adjacent_list, vector 
         while (iss >> a)
         {
             adjacent[make_pair(lineCnt,a)] = 1;
-            adjacent_tmp.push_back(make_pair(lineCnt,a));
+            adjacent_tmp.emplace_back(make_pair(lineCnt,a));
         }
         lineCnt++;
     }
@@ -242,8 +248,8 @@ void read_graph(string filename, vector <pair<int,int> > &adjacent_list, vector 
         int a;
         while (iss >> a) weight[adjacent_tmp[lineCnt++]] = a;
     }
-    for(map <pair<int,int>,int>::iterator it=adjacent.begin(); it!=adjacent.end(); ++it) {
-        adjacent_list.push_back(it->first);
+    for(auto it:adjacent) {
+        adjacent_list.push_back(it.first);
     }
     std::getline(infile, line);
     istringstream iss(line);
