@@ -18,11 +18,11 @@ void read_graph(const string&, vector <pair<int,int> > &adjacent_list, vector <i
 void ProcDWaveOutput(int &quboSize, map<vector<int>, int> &);
 void find_and_replace(string& source, string const& find, string const& replace);
 vector<string> split(const std::string &text, char sep);
-//void VerifySolutions(map<vector<int>, int>&, map<pair<int,int>,int>, vector <pair<int,int> >);
+void VerifySolutions(map<vector<int>, int>&, map<vector<int>,int>, vector <int>);
 void CalcAccuracy(map<vector<int>, int>, map<vector<int>,int>, map<pair<int,int>,int>);
 void printCSV(int min);
 void printSol(map<int,int> solOccur);
-//void printDebug(int, int, vector<int>);
+void printDebug(int, int, vector<int>);
 
 bool DEBUG=false;
 bool CSV=false;
@@ -71,14 +71,6 @@ int main(int argc, char *argv[])
     int nominated_root = setU[0];
     map<vector<int>,int> edge2matrix;
 
-    // set V/U
-    vector <int> setV_U;
-    for(int i=0;i<order;i++){
-        if(std::find(setU.begin(), setU.end(), i) == setU.end()){
-            setV_U.push_back(i);
-        }
-    }
-
     // init variables e_uv,i, and index of each variable in Q matrix
     int cnt=0;
     for (auto iterator : adjacent_list) {
@@ -100,13 +92,13 @@ int main(int argc, char *argv[])
             }
         }
     }
-    if(DEBUG) for(auto it:edge2matrix)
+    if(DEBUG)
     {
-        printf("e%d,%d,%d ", it.first[FIRST]+1, it.first[MIDDLE]+1, it.first[LAST]);
+        for(auto it:edge2matrix) printf("e%d,%d,%d ", it.first[FIRST]+1, it.first[MIDDLE]+1, it.first[LAST]);
         cout<<endl;
     }
 
-    //VerifySolutions(quboSolutions, edge2matrix, x2matrix, adjacent_list);
+    VerifySolutions(quboSolutions, edge2matrix, setU);
     CalcAccuracy(quboSolutions, edge2matrix, weight);
 
     return 0;
@@ -198,30 +190,94 @@ void ProcDWaveOutput(int &quboSize, map<vector<int>, int> &solutions){
     }
 }
 
-//void VerifySolutions(map<vector<int> ,int>& quboSolutions, map<pair<int,int>,int> edge2matrix, vector <pair<int,int> > adjacent_list)
-//{
-//    int nominated_root=0;
-//    bool valid;
-//    for(auto sol:quboSolutions)
-//    {
-//        auto vars = sol.first;
-//        /********* F_{I,1} *********/
-//        int F1=0;
-//
-//        /********* F_{I,2} *********/
-//        int F2=0;
-//
-//        cout<<"f21"<<endl;
-//        if (F2 != 0) {
-//            if(DEBUG)printDebug(2,F2,vars);
-//            //quboSolutions.erase(sol.first);
-//            continue;
-//        }
-//
-//
-//    }
-//    cout<<"finish verify"<<endl;
-//}
+void VerifySolutions(map<vector<int> ,int>& quboSolutions, map<vector<int>,int> edge2matrix, vector<int> setU)
+{
+    int nominated_root=setU[0];
+
+    // set V/U
+    vector <int> setV_U;
+    for(int i=0;i<order;i++){
+        if(std::find(setU.begin(), setU.end(), i) == setU.end()){
+            setV_U.push_back(i);
+        }
+    }
+
+    map<vector<int> ,int> allSols;
+    for(auto sol:quboSolutions) allSols[sol.first] = sol.second;
+
+    for(auto sol:allSols)
+    {
+        auto vars = sol.first;
+        /********* F_{I,1} *********/
+        int F1=0;
+        for(auto v:setU)
+        {
+            F1=1;
+            if (v == nominated_root) continue;
+            for(auto iti:edge2matrix)
+            {
+                if(iti.first[MIDDLE] != v) continue;
+                F1 = F1 - vars[iti.second];
+            }
+            if(F1!=0)
+            {
+                if(DEBUG)printDebug(1,F1,vars);
+                quboSolutions.erase(sol.first);
+                break;
+            }
+        }
+        if(F1!=0)continue;
+
+        /********* F_{I,2} *********/
+        int F2=0;
+        for(auto v:setV_U)
+        {
+            F2=0;
+            for(auto iti:edge2matrix){
+                if (iti.first[MIDDLE] != v ) continue;
+                for(auto itj:edge2matrix) {
+                    if (itj.first[MIDDLE] != v || iti.first[FIRST] >= itj.first[FIRST]) continue;
+                    F2 = F2 + vars[iti.second] * vars[itj.second];
+                }
+            }
+        }
+        if (F2!=0) {
+            if(DEBUG)printDebug(2,F2,vars);
+            quboSolutions.erase(sol.first);
+            continue;
+        }
+
+        /********* F_{I,3} *********/
+        int F3=0;
+        int sum,u;
+        bool value=true;
+        for(int v=0; v<order; v++)
+        {
+            F3=0;
+            if (v == nominated_root) continue;
+            for(auto iti:edge2matrix)
+            {
+                if(iti.first[MIDDLE] != v) continue;
+                if(iti.first[LAST] < 2) continue;
+                u=iti.first[FIRST];
+                sum=1;
+                for(auto itj:edge2matrix){
+                    if(itj.first[MIDDLE] != u) continue;
+                    if(itj.first[LAST] != (iti.first[LAST]-1)) continue;
+                    sum = sum - vars[itj.second];
+                }
+                F3 = sum * vars[iti.second];
+                if (F3 != 0) {
+                    if(DEBUG)printDebug(3,F3,vars);
+                    quboSolutions.erase(sol.first);
+                    value=false;
+                    break;
+                }
+            }
+            if(!value)break;
+        }
+    }
+}
 
 void CalcAccuracy(map<vector<int> ,int> quboSolutions, map<vector<int>,int> edge2matrix, map<pair<int,int>,int> weight)
 {
@@ -241,13 +297,18 @@ void CalcAccuracy(map<vector<int> ,int> quboSolutions, map<vector<int>,int> edge
 
         if(solOccur.count(sum)==0) solOccur[sum] = sol.second;
         else solOccur[sum] = solOccur[sum] + sol.second;
-        if (DEBUG) cout<<"Solution value  = "<<sum<<" occurance  = "<<solOccur[sum]<<endl;
+        if(sum==minCost)
+        {
+            cout<<"variables:[";
+            for (auto i : sol.first) cout<<i<<" ";
+            cout<<"]"<<endl;
+        }
     }
-
+    int min = solOccur.empty()?0:solOccur.begin()->first;
     if(solOccur.count(minCost)==0)correct_run=0;
     else correct_run = solOccur[minCost];
 
-    if(CSV)printCSV(solOccur.begin()->first);
+    if(CSV)printCSV(min);
     else printSol(solOccur);
 }
 
@@ -319,13 +380,13 @@ void printSol(map<int,int> solOccur)
     }
 }
 
-//void printDebug(int num, int F, vector<int> vars)
-//{
-//    cout<<"F"<<num<< " = "<< F<<endl;
-//    cout<<"variables:[";
-//    for (auto i : vars) cout<<i<<" ";
-//    cout<<"]"<<endl;
-//}
+void printDebug(int num, int F, vector<int> vars)
+{
+    cout<<"F"<<num<< " = "<< F<<endl;
+    cout<<"variables:[";
+    for (auto i : vars) cout<<i<<" ";
+    cout<<"]"<<endl;
+}
 
 // utilities
 void find_and_replace(string& source, string const& find, string const& replace){

@@ -157,7 +157,6 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
             if(iti->first[LAST] < 2) continue;
             u=iti->first[FIRST];
             int idx1 = iti->second;
-            //bool hasParent=false;
             Q[idx1][idx1]++;
             for(map<vector<int>,int>::iterator itj=edge2matrix.begin(); itj!=edge2matrix.end(); ++itj)
             {
@@ -165,11 +164,7 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
                 if(itj->first[LAST] != (iti->first[LAST]-1)) continue;
                 int idx2 = itj->second;
                 Q[idx1][idx2]--;
-                //hasParent = true;
             }
-//            if (hasParent) {
-//                Q[idx1][idx1]++;
-//            }
         }
     }
 #ifdef DEBUG
