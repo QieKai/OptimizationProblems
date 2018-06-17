@@ -153,3 +153,4 @@ void read_qubo(int &n, double **&Q) {
             cin >> Q[i][j];
     }
 }
+

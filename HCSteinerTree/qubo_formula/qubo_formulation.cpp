@@ -6,11 +6,11 @@
 #include <cmath>
 #include <map>
 #include <algorithm>
-//#define DEBUG
 
 #define FIRST 0
 #define MIDDLE 1
 #define LAST 2
+bool DEBUG=false;
 
 using namespace std;
 void print_matrix(double **Q, int n);
@@ -26,7 +26,13 @@ int main(int argc, char *argv[])
     vector <pair<int,int> > adjacent_list;
     vector <int> setU;
     map<pair<int,int>,int> weight;
-    if (argc != 2) cout << "Correct usage: " << argv[0] <<" <Hop constraint>" << endl;
+    if (argc != 2 && argc != 3) cout << "Correct usage: " << argv[0] <<" <Hop constraint>" << endl;
+    else if(argc == 3)
+    {
+        string arg = string(argv[1]);
+        if(arg.find('d')!=string::npos) DEBUG=true;
+        hop_constraint = (int)strtol (argv[2], nullptr,10);
+    }
     else hop_constraint = (int)strtol (argv[1], nullptr,10);
     cin>>node_size;
 
@@ -91,15 +97,16 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
         for (int j=0; j<N; j++) Q[i][j] = 0;
     }
 
-#ifdef DEBUG
-    /*********** debug ************/
-    for(map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
+    if(DEBUG)
     {
-        printf("e%d,%d ", it->first[FIRST]+1, it->first[MIDDLE]+1);
+        /*********** debug ************/
+        for(map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
+        {
+            printf("e%d,%d ", it->first[FIRST]+1, it->first[MIDDLE]+1);
+        }
+        printf("\n");
+        /*********** debug ************/
     }
-    printf("\n");
-    /*********** debug ************/
-#endif
 
     /********* F_{I,1} *********/
     for(int i=0; i<setU.size(); i++)
@@ -125,11 +132,12 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
             }
         }
     }
-#ifdef DEBUG
-    printf("\n********* F_{I,1} *********\n");
-    print_matrix(Q, N);
-#endif
-
+    if(DEBUG)
+    {
+        printf("\n********* F_{I,1} *********\n");
+        print_matrix(Q, N);
+    }
+    
     /********* F_{I,2} *********/
     int u,v;
     for(int i = 0; i<setV_U.size(); i++){
@@ -143,11 +151,11 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
         }
     }
 
-#ifdef DEBUG
-    printf("\n********* F_{I,2} *********\n");
-    print_matrix(Q, N);
-#endif
-
+    if(DEBUG){
+        printf("\n********* F_{I,2} *********\n");
+        print_matrix(Q, N);
+    }
+    
     /********* F_{I,3} *********/
     for(v=0; v<node_size; v++){
         if (v == nominated_root) continue;
@@ -167,10 +175,10 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
             }
         }
     }
-#ifdef DEBUG
-    printf("\n********* F_{I,3} *********\n");
-    print_matrix(Q, N);
-#endif
+    if(DEBUG){
+        printf("\n********* F_{I,3} *********\n");
+        print_matrix(Q, N);
+    }
 
 
     /********* P_I *********/
@@ -183,11 +191,11 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
         for (int j=0; j<N; j++)
             Q[i][j] = Q[i][j] * P_I;
     }
-#ifdef DEBUG
-    printf("\n********* P_I *********\n");
-    print_matrix(Q, N);
-    printf("\n");
-#endif
+    if(DEBUG){
+        printf("\n********* P_I *********\n");
+        print_matrix(Q, N);
+        printf("\n");
+    }
     /********* O_I *********/
     for(map<vector<int>,int>::iterator it=edge2matrix.begin(); it!=edge2matrix.end(); ++it)
     {
@@ -195,11 +203,11 @@ const long generate_qubo(double **&Q, int node_size, vector<pair<int, int> > adj
         v = it->first[MIDDLE];
         Q[it->second][it->second] = Q[it->second][it->second] + weight[make_pair(u,v)];
     }
-#ifdef DEBUG
-    printf("\n********* O_I *********\n");
-    print_matrix(Q, N);
-    printf("\n");
-#endif
+    if(DEBUG){
+        printf("\n********* O_I *********\n");
+        print_matrix(Q, N);
+        printf("\n");
+    }
 
     return N;
 }
@@ -275,15 +283,15 @@ void read_graph(const int n, vector <pair<int,int> > &adjacent_list, vector <int
     int a;
     while (iss >> a) setU.push_back(a);
 
-#ifdef DEBUG
-    for(std::map<pair<int,int>,int>::iterator iti=weight.begin(); iti!=weight.end(); ++iti)
-    {
-        cout << iti->first.first << " "<< iti->first.second << " -> " << iti->second<<endl;
+    if(DEBUG){
+        for(std::map<pair<int,int>,int>::iterator iti=weight.begin(); iti!=weight.end(); ++iti)
+        {
+            cout << iti->first.first << " "<< iti->first.second << " -> " << iti->second<<endl;
+        }
+        
+        for(vector <int>::iterator iti=setU.begin(); iti!=setU.end(); ++iti)
+        {
+            cout << *iti <<endl;
+        }
     }
-
-    for(vector <int>::iterator iti=setU.begin(); iti!=setU.end(); ++iti)
-    {
-        cout << *iti <<endl;
-    }
-#endif
 }

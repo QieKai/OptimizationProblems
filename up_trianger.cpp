@@ -2,8 +2,6 @@
 #include <fstream>
 using namespace std;
 
-void printMatrix(double**, int);
-
 //Comments: prints a n-by-n matrix
 void printMatrix(double **Q, int n)
 {
@@ -14,9 +12,31 @@ void printMatrix(double **Q, int n)
         cout << endl;
     }
 }
+//Comments: prints a n-by-n matrix
+void printMatrixUpTriangular(double **Q, int n)
+{
+    for (int i=0; i<n; i++)
+    {
+        for (int j=0; j<n; j++)
+        {
+            if(j<i)cout<<"& ";
+            else if(j==i)cout << Q[i][j]<<" & ";
+            else cout << Q[i][j]+Q[j][i] << " & ";
+        }
+        cout << endl;
+    }
+}
 
-void read_qubo(const int n, double **&Q) {
+void read_qubo(int &n, double **&Q) {
     // Start of: initializing Q
+    string line;
+    getline(cin,line);
+    std::size_t pos = line.find(" ");
+    if(pos!=std::string::npos)
+    {
+        line = line.substr(0,pos);
+    }
+    n = atoi(line.c_str());
     Q = new double*[n];
     for (int i=0; i<n; i++)
     {
@@ -30,13 +50,11 @@ void read_qubo(const int n, double **&Q) {
             cin >> Q[i][j];
     }
 }
-
 int main(int argc, char* argv[])
 {
     int n,k;
     double **Q;
-    cin>>n;
-    //cin>>k;
+
     read_qubo(n,Q);
     
     for (int i=0; i<n; i++)
@@ -49,7 +67,8 @@ int main(int argc, char* argv[])
         }
     }
     cout<<n<<endl;
-    printMatrix(Q,n);
+    //printMatrix(Q,n);
+    printMatrixUpTriangular(n,Q);
     
     for (int i=0; i<n; i++)
         delete [] Q[i];

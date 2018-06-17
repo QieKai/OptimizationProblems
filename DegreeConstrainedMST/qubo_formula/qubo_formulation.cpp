@@ -1,12 +1,12 @@
-// QUBO formulation for Degree-Constrained Minimum Spanning Tree (∆-spanning tree)
-// Variable dConst represents the degree constraint of ∆-spanning tree problem
+// QUBO formulation for Degree-Constrained Minimum Spanning Tree
+// Usage: a.out ∆ < graph.alist
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <sstream>
 #include <cmath>
 #include <map>
-//#define DEBUG
+#define DEBUG
 
 using namespace std;
 void print_matrix(double **Q, int n);
